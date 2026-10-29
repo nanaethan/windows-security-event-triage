@@ -1,2 +1,147 @@
-# windows-security-event-triage
-Sanitized Windows Security event triage with PowerShell
+# Windows Security Event Triage Report
+
+## Executive Summary
+
+I reviewed up to 300 Windows Security events from the previous seven days, limited to successful logons, failed logons, and sensitive privileges assigned to new logons. The exported evidence was sanitized before publication.
+
+## Investigation Question
+
+What authentication and privileged-logon activity is visible on this Windows endpoint, and does the available evidence justify escalation?
+
+## Data Scope
+
+- Host type: Windows 10 Pro workstation
+- Time window: Previous seven days
+- Event IDs reviewed: 4624, 4625, 4672
+- Collection method: Windows PowerShell and Get-WinEvent
+- Publication rule: No raw usernames, computer names, raw IP addresses, full messages, or EVTX files
+
+## Findings 
+PS C:\Windows\System32> Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625,4672; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 30
+
+   ProviderName: Microsoft-Windows-Security-Auditing
+
+TimeCreated                     Id LevelDisplayName Message
+-----------                     -- ---------------- -------
+29/10/2026 16:33:31           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:33:31           4624 Information      An account was successfully logged on.…
+29/10/2026 16:33:02           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:33:02           4624 Information      An account was successfully logged on.…
+29/10/2026 16:33:02           4624 Information      An account was successfully logged on.…
+29/10/2026 16:32:56           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:32:56           4624 Information      An account was successfully logged on.…
+29/10/2026 16:32:56           4624 Information      An account was successfully logged on.…
+29/10/2026 16:32:52           4625 Information      An account failed to log on.…
+29/10/2026 16:32:48           4625 Information      An account failed to log on.…
+29/10/2026 16:32:33           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:32:33           4624 Information      An account was successfully logged on.…
+29/10/2026 16:29:53           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:29:53           4624 Information      An account was successfully logged on.…
+29/10/2026 16:29:34           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:29:34           4624 Information      An account was successfully logged on.…
+29/10/2026 16:25:45           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:25:45           4624 Information      An account was successfully logged on.…
+29/10/2026 16:24:51           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:24:51           4624 Information      An account was successfully logged on.…
+29/10/2026 16:23:34           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:23:34           4624 Information      An account was successfully logged on.…
+29/10/2026 16:23:34           4624 Information      An account was successfully logged on.…
+29/10/2026 16:23:29           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:23:29           4624 Information      An account was successfully logged on.…
+29/10/2026 16:23:29           4624 Information      An account was successfully logged on.…
+29/10/2026 16:23:25           4625 Information      An account failed to log on.…
+29/10/2026 16:23:20           4625 Information      An account failed to log on.…
+29/10/2026 16:23:10           4672 Information      Special privileges assigned to new logon.…
+29/10/2026 16:23:10           4624 Information      An account was successfully logged on.…
+
+Successful-logon count (4624): 15
+Failed-logon count (4625): 4
+Sensitive-privilege count (4672): 11
+
+Most common logon type: Type 2 - Interactive logon (and Type 5 - Service logon for background services). All 4624 events show Information level with message "An account was successfully logged on..." on the local workstation.
+
+Sanitized pattern observed: Each 4672 "Special privileges assigned to new logon" event is immediately followed by a 4624 "An account was successfully logged on" event at the same timestamp (e.g., 29/10/2026 16:33:31 - 4672 then 16:33:31 - 4624). Failed logons are clustered at 16:23:20-16:23:29 and 16:32:52, followed by successful logon at same minute. All account names and remote addresses in sanitized exports show as (name redacted) and (redacted).
+
+## Assessment
+
+Classification: expected
+
+Evidence: Activity shows 15 normal successful logons vs only 4 failed logons (low ratio, not brute force). The repeated 4672 -> 4624 pairing is standard Windows behavior when an admin account logs on and receives SeSecurityPrivilege, SeBackupPrivilege, etc. Failed logons are isolated to two short time windows (16:23 and 16:32) consistent with typos, not sustained attack. No Event IDs indicating lateral movement (Type 3 remote logon with suspicious source IP) or log clearing (1102). Sanitized report confirms PII was protected with (redacted) placeholders.
+
+## MITRE ATT&CK Context
+
+Authentication-failure telemetry can support investigation of Brute Force activity, including technique T1110. Event evidence must be evaluated as a pattern and with environmental context.
+
+## Limitations
+
+- This is a single Windows endpoint, not an enterprise SIEM.
+- The query is limited to three event IDs and a seven-day window.
+- Event availability depends on local audit configuration and log retention.
+- Sanitization removes identifiers that would normally support deeper enterprise correlation.
+- The available events alone may not prove intent or compromise.
+
+## Recommended Next Actions
+
+1. Establish a normal authentication baseline over a longer period.
+2. Correlate repeated failures by account, source, and time window in an authorized lab or SIEM.
+3. Add endpoint process and network telemetry in a later project.
+4. Escalate only when frequency, account value, source, timing, or related behavior increases risk.
+
+# Windows Security Event Triage with PowerShell
+
+A beginner SOC portfolio project that turns noisy Windows Security logs into sanitized, recruiter-readable evidence.
+
+## What This Demonstrates
+
+- Windows event-log triage with PowerShell
+- Efficient filtering with Get-WinEvent
+- Interpretation of event IDs 4624, 4625, and 4672
+- XML event-field extraction
+- Evidence sanitization before public sharing
+- CSV and HTML reporting
+- SOC-style assessment, limitations, and next actions
+
+## Project Output
+
+Running `Analyze-WindowsSecurity.ps1` creates:
+
+- `output/security-findings.csv`
+- `output/security-report.html`
+
+The repository also includes an investigation report and a sanitized screenshot of the HTML output.
+
+## How to Run
+
+1. Open Windows PowerShell as Administrator.
+2. Change to the project directory.
+3. Run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Analyze-WindowsSecurity.ps1
+```
+
+4. Open `output/security-report.html` in a browser.
+
+The execution-policy setting applies only to the launched PowerShell process. Review scripts before running them.
+
+## Events Reviewed
+
+- 4624: successful logon
+- 4625: failed logon
+- 4672: sensitive privileges assigned to a new logon
+
+## Privacy and Safety
+
+This public repository does not include raw EVTX files, raw usernames, computer names, full event messages, passwords, tokens, or raw remote addresses. The script exports categories instead of identifying values.
+
+## Analyst Takeaway
+
+A single event is not automatically an incident. Useful triage combines event meaning, frequency, account context, logon type, source context, related activity, and known limitations.
+
+## References
+
+- Microsoft Get-WinEvent documentation: https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent
+- Microsoft event 4624 documentation: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4624
+- Microsoft event 4625 documentation: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625
+- Microsoft event 4672 documentation: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4672
+- MITRE ATT&CK Brute Force T1110: https://attack.mitre.org/techniques/T1110/
